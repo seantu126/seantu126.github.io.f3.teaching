@@ -116,6 +116,19 @@
       box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
 
+    .control-group label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .control-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
+
     input[type="range"] {
       width: 160px;
     }
@@ -347,18 +360,30 @@
         </div>
 
         <div>
-          Let \(R=l_1\cap l_2\). Away from the exceptional angles, one obtains
+          Solving the two tangent equations leads to four logical cases:
           \[
-            R=(a\sec\theta,\;0),
+            \cos\theta\neq 0,\ \sin\theta\neq 0
+            \implies
+            R=l_1\cap l_2=(a\sec\theta,0),
           \]
-          so the displayed locus is the \(x\)-axis branch
           \[
-            y=0,\qquad |x|>a.
+            \cos\theta\neq 0,\ \sin\theta=0
+            \implies
+            l_1=l_2,\quad x=\pm a,
           \]
+          so there are infinitely many intersection points on a vertical line;
+          \[
+            \cos\theta=0,\ \sin\theta\neq 0
+            \implies
+            l_1: y=\pm b,\quad l_2: y=\pm a,
+          \]
+          hence there is no intersection if \(a\neq b\), and infinitely many if \(a=b\).
+          The case \(\cos\theta=0\) and \(\sin\theta=0\) is impossible.
         </div>
 
         <div class="small">
-          The animation skips small neighborhoods of the exceptional angles so that the trace does not draw artificial horizontal jumps across undefined cases.
+          Use the two checkboxes to choose which case to display. In the infinite-intersection cases,
+          the full blue locus line is drawn directly.
         </div>
       </div>
 
@@ -376,9 +401,23 @@
         </div>
 
         <div class="control-group">
-          <span>\(\theta\) (deg):</span>
-          <input type="range" id="ex3-theta" min="0" max="360" step="0.2" value="28" />
-          <span id="ex3-theta-val">28.0</span>
+          <span>\(\theta\) (rad):</span>
+          <input type="range" id="ex3-theta" min="0" max="6.283185307179586" step="0.005" value="0.49" />
+          <span id="ex3-theta-val">0.490 rad</span>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="ex3-allow-cos-zero" />
+            <span>Allow \(\cos\theta = 0\)</span>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="ex3-allow-sin-zero" />
+            <span>Allow \(\sin\theta = 0\)</span>
+          </label>
         </div>
 
         <div class="control-group">
@@ -396,16 +435,12 @@
       </div>
 
       <div class="note">
-        Blue trace = locus of \(R\). Red point = current position of \(R\). The circle \(C\) and both tangent lines are drawn in light gray.
+        Blue trace = locus of \(R\) in the unique-intersection case, or the full blue line in the infinite-intersection cases.
+        Red point = current position of \(R\) only when the intersection is unique.
       </div>
 
-      <div class="remark-below">
-        <strong>Remark on the skipped angles.</strong>
-        At \(\theta=\frac{\pi}{2}\), the ellipse tangent is \(y=b\) while the circle tangent is \(y=a\).
-        When \(a\neq b\), these are two distinct horizontal parallel lines, so they do not meet and the point \(R\) does not exist.
-        For that reason, the animation deliberately breaks the trace there instead of drawing an artificial jump.
-        Similarly, at \(\theta=\frac{3\pi}{2}\) the tangents become \(y=-b\) and \(y=-a\), so the same issue occurs.
-        Also, at \(\theta=0\) and \(\theta=\pi\), the two tangents coincide, so the “intersection point” is not uniquely determined.
+      <div id="ex3-mode-note" class="remark-below">
+        Allowed special cases: none. The animation runs through \(0\leq \theta \leq 2\pi\), and the blue trace follows the unique-intersection branch except at excluded special angles.
       </div>
     </section>
 
@@ -568,43 +603,99 @@
       if (trace.length > 1800) trace.shift();
     }
 
-    function normalizeDeg(d) {
-      let x = d % 360;
-      if (x < 0) x += 360;
+    const TAU = 2 * Math.PI;
+
+    function wrapToTau(x) {
+      while (x < 0) x += TAU;
+      while (x > TAU) x -= TAU;
       return x;
     }
 
-    function angleDistanceDeg(a, b) {
-      let d = Math.abs(normalizeDeg(a) - normalizeDeg(b));
-      return Math.min(d, 360 - d);
+    function formatEx3Theta(theta) {
+      const special = [
+        [0, "0"],
+        [Math.PI / 2, "π/2"],
+        [Math.PI, "π"],
+        [3 * Math.PI / 2, "3π/2"],
+        [TAU, "2π"]
+      ];
+
+      for (const [value, label] of special) {
+        if (Math.abs(theta - value) < 0.012) return `${label} rad`;
+      }
+
+      return `${theta.toFixed(3)} rad`;
     }
 
-    function nearForbiddenTheta(thetaDeg, eps = 2.0) {
-      const forbidden = [0, 90, 180, 270, 360];
-      return forbidden.some(c => angleDistanceDeg(thetaDeg, c) < eps);
+    function getEx3Allowances() {
+      return {
+        allowCosZero: document.getElementById("ex3-allow-cos-zero").checked,
+        allowSinZero: document.getElementById("ex3-allow-sin-zero").checked
+      };
     }
 
-    function advanceThetaRawSkipping(thetaRaw, stepDeg, eps = 2.0) {
-      const previous = thetaRaw;
-      let next = thetaRaw + stepDeg;
-      let crossedForbidden = false;
+    function ex3AllowanceKey(allowances) {
+      return `${allowances.allowCosZero ? 1 : 0}-${allowances.allowSinZero ? 1 : 0}`;
+    }
 
-      const kMin = Math.floor((previous - eps) / 90) - 1;
-      const kMax = Math.ceil((next + eps) / 90) + 1;
+    function classifyEx3Theta(theta, eps = 0.04) {
+      const specials = [
+        { value: 0, kind: "sin-zero", label: "0" },
+        { value: Math.PI / 2, kind: "cos-zero", label: "π/2" },
+        { value: Math.PI, kind: "sin-zero", label: "π" },
+        { value: 3 * Math.PI / 2, kind: "cos-zero", label: "3π/2" },
+        { value: TAU, kind: "sin-zero", label: "2π" }
+      ];
 
-      for (let k = kMin; k <= kMax; k++) {
-        const center = 90 * k;
-        const left = center - eps;
-        const right = center + eps;
-
-        if (previous < right && next >= left) {
-          next = center + eps + 0.6;
-          crossedForbidden = true;
-          break;
+      let best = null;
+      let bestDist = Infinity;
+      for (const sp of specials) {
+        let d = Math.abs(theta - sp.value);
+        if (sp.value === 0 || sp.value === TAU) {
+          d = Math.min(d, Math.abs(theta), Math.abs(theta - TAU));
+        }
+        if (d < bestDist) {
+          best = sp;
+          bestDist = d;
         }
       }
 
-      return { next, crossedForbidden };
+      if (best && bestDist < eps) return best;
+      return { value: theta, kind: "regular", label: null };
+    }
+
+    function isEx3StateAllowed(state, allowances) {
+      if (state.kind === "regular") return true;
+      if (state.kind === "cos-zero") return allowances.allowCosZero;
+      if (state.kind === "sin-zero") return allowances.allowSinZero;
+      return false;
+    }
+
+    function findEx3CrossedSpecialAngles(previous, next) {
+      const result = [];
+      const intervals = next >= previous
+        ? [[previous, next]]
+        : [[previous, TAU], [0, next]];
+      const specials = [Math.PI / 2, Math.PI, 3 * Math.PI / 2, TAU];
+
+      for (const [left, right] of intervals) {
+        for (const sp of specials) {
+          if (left < sp && sp <= right) {
+            result.push(sp);
+          }
+        }
+      }
+      return result;
+    }
+
+    function updateEx3ModeNote(html) {
+      const box = document.getElementById("ex3-mode-note");
+      if (box.dataset.renderedHtml === html) return;
+      box.innerHTML = html;
+      box.dataset.renderedHtml = html;
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        MathJax.typesetPromise([box]).catch(() => {});
+      }
     }
 
     new p5(function(p) {
@@ -735,11 +826,34 @@
     });
 
     new p5(function(p) {
-      let thetaRaw = 28;
-      let thetaDeg = 28;
-      let previousDisplayedTheta = 28;
+      let thetaRaw = 0.49;
+      let previousSliderTheta = 0.49;
+      let previousAllowanceKey = "0-0";
+      let previousA = 180;
+      let previousB = 110;
       let playing = true;
-      let trace = [];
+      let pointTrace = [];
+      let tracedVerticalPositive = false;
+      let tracedVerticalNegative = false;
+      let tracedHorizontalPositive = false;
+      let tracedHorizontalNegative = false;
+
+      function resetEx3Trace() {
+        pointTrace = [];
+        tracedVerticalPositive = false;
+        tracedVerticalNegative = false;
+        tracedHorizontalPositive = false;
+        tracedHorizontalNegative = false;
+      }
+
+      function drawAccumulatedDegenerateTrace(a, zoom, showHorizontal) {
+        p.stroke(37, 99, 235);
+        p.strokeWeight(2.4 / zoom);
+        if (tracedVerticalPositive) p.line(a, -2000, a, 2000);
+        if (tracedVerticalNegative) p.line(-a, -2000, -a, 2000);
+        if (showHorizontal && tracedHorizontalPositive) p.line(-2000, a, 2000, a);
+        if (showHorizontal && tracedHorizontalNegative) p.line(-2000, -a, 2000, -a);
+      }
 
       p.setup = function() {
         const cnv = p.createCanvas(920, 620);
@@ -751,7 +865,7 @@
         };
 
         document.getElementById("ex3-clear").onclick = () => {
-          trace = [];
+          resetEx3Trace();
         };
       };
 
@@ -761,37 +875,78 @@
         const a = parseFloat(document.getElementById("ex3-a").value);
         const b = parseFloat(document.getElementById("ex3-b").value);
         const zoom = parseFloat(document.getElementById("ex3-zoom").value);
+        const slider = document.getElementById("ex3-theta");
+        const allowances = getEx3Allowances();
+        const allowanceKey = ex3AllowanceKey(allowances);
 
         document.getElementById("ex3-a-val").textContent = a.toFixed(0);
         document.getElementById("ex3-b-val").textContent = b.toFixed(0);
         document.getElementById("ex3-zoom-val").textContent = zoom.toFixed(1);
 
-        if (playing) {
-          const advanced = advanceThetaRawSkipping(thetaRaw, 0.45, 2.0);
-          thetaRaw = advanced.next;
-          thetaDeg = normalizeDeg(thetaRaw);
-
-          if (advanced.crossedForbidden) {
-            pushTraceBreak(trace);
-          }
-
-          document.getElementById("ex3-theta").value = thetaDeg;
-        } else {
-          thetaDeg = parseFloat(document.getElementById("ex3-theta").value);
-
-          if (Math.abs(thetaDeg - previousDisplayedTheta) > 1e-9) {
-            pushTraceBreak(trace);
-          }
-
-          thetaRaw = thetaDeg;
+        if (allowanceKey !== previousAllowanceKey || Math.abs(a - previousA) > 1e-9 || Math.abs(b - previousB) > 1e-9) {
+          resetEx3Trace();
         }
 
-        previousDisplayedTheta = thetaDeg;
-        document.getElementById("ex3-theta-val").textContent = thetaDeg.toFixed(1);
+        let crossedSpecials = [];
+        if (playing) {
+          const previousTheta = thetaRaw;
+          thetaRaw += 0.018;
+          if (thetaRaw > TAU) thetaRaw -= TAU;
+          crossedSpecials = findEx3CrossedSpecialAngles(previousTheta, thetaRaw);
+        } else {
+          const sliderTheta = parseFloat(slider.value);
+          if (Math.abs(sliderTheta - previousSliderTheta) > 0.02) {
+            pushTraceBreak(pointTrace);
+          }
+          thetaRaw = sliderTheta;
+        }
 
-        const theta = thetaDeg * Math.PI / 180;
-        const c = Math.cos(theta);
-        const s = Math.sin(theta);
+        let thetaDisplay = thetaRaw;
+        let state = classifyEx3Theta(thetaRaw);
+        if (playing && crossedSpecials.length > 0) {
+          thetaDisplay = crossedSpecials[0];
+          state = classifyEx3Theta(thetaDisplay, 1e-6);
+        }
+
+        slider.value = thetaRaw;
+        previousSliderTheta = thetaRaw;
+        previousAllowanceKey = allowanceKey;
+        previousA = a;
+        previousB = b;
+
+        document.getElementById("ex3-theta-val").textContent = formatEx3Theta(thetaDisplay);
+
+        const c = Math.cos(thetaDisplay);
+        const s = Math.sin(thetaDisplay);
+        const equalCase = Math.abs(a - b) < 0.5;
+        const stateAllowed = isEx3StateAllowed(state, allowances);
+
+        if (!stateAllowed) {
+          pushTraceBreak(pointTrace);
+        }
+
+        let modeNoteHtml = `Allowed special cases: \\(\\cos\\theta=0\\): ${allowances.allowCosZero ? "included" : "excluded"}, \\(\\sin\\theta=0\\): ${allowances.allowSinZero ? "included" : "excluded"}. `;
+
+        if (state.kind === "regular") {
+          modeNoteHtml += "At the current angle, both \\(\\cos\\theta\\) and \\(\\sin\\theta\\) are nonzero, so the intersection is unique and the blue trace follows \\(R=(a\\sec\\theta,0)\\).";
+        } else if (state.kind === "sin-zero") {
+          if (allowances.allowSinZero) {
+            modeNoteHtml += "The current angle hits \\(\\sin\\theta=0\\). Then the tangents overlap, so there are infinitely many intersection points on the vertical line \\(x=a\\cos\\theta\\), and that entire line is traced in blue.";
+          } else {
+            modeNoteHtml += "The current angle hits \\(\\sin\\theta=0\\), but that degenerate case is excluded, so the blue point-trace breaks here.";
+          }
+        } else if (state.kind === "cos-zero") {
+          if (allowances.allowCosZero) {
+            if (equalCase) {
+              modeNoteHtml += "The current angle hits \\(\\cos\\theta=0\\). Since \\(a=b\\), the tangents overlap, so there are infinitely many intersection points on the horizontal line \\(y=a\\sin\\theta\\), and that entire line is traced in blue.";
+            } else {
+              modeNoteHtml += "The current angle hits \\(\\cos\\theta=0\\). Here \\(l_1: y=b\\sin\\theta\\) and \\(l_2: y=a\\sin\\theta\\). If \\(a\\neq b\\), they are distinct parallel lines, so there is no intersection at this angle.";
+            }
+          } else {
+            modeNoteHtml += "The current angle hits \\(\\cos\\theta=0\\), but that special case is excluded, so the blue point-trace breaks here.";
+          }
+        }
+        updateEx3ModeNote(modeNoteHtml);
 
         p.push();
         p.translate(p.width / 2, p.height / 2);
@@ -800,10 +955,10 @@
         drawAxesWorld(p, zoom);
 
         p.noFill();
-        p.stroke(95);
+        p.stroke(210);
         p.strokeWeight(1.8 / zoom);
         p.beginShape();
-        for (let u = 0; u <= 2 * Math.PI + 0.01; u += 0.02) {
+        for (let u = 0; u <= TAU + 0.01; u += 0.02) {
           p.vertex(a * Math.cos(u), b * Math.sin(u));
         }
         p.endShape();
@@ -813,18 +968,11 @@
         p.strokeWeight(1.8 / zoom);
         p.ellipse(0, 0, 2 * a, 2 * a);
 
-        drawWorldText(p, "E", a * 0.62, -b * 0.56, zoom, 18, true);
+        drawWorldText(p, "E", a * 0.62, -b * 0.56, zoom, 18, true, null, null, 120);
         drawWorldText(p, "C", a * 0.72, a * 0.52, zoom, 18, true, null, null, 120);
 
-        const Px = a * c;
-        const Py = b * s;
-        const Qx = a * c;
-        const Qy = a * s;
-
-        const d1x = -a * s;
-        const d1y =  b * c;
-        const d2x = -s;
-        const d2y =  c;
+        let Px = a * c, Py = b * s, Qx = a * c, Qy = a * s;
+        let d1x = -a * s, d1y = b * c, d2x = -s, d2y = c;
 
         drawLineThroughPointDirection(p, Px, Py, d1x, d1y, 1000, p.color(185), 1.4, zoom);
         drawLineThroughPointDirection(p, Qx, Qy, d2x, d2y, 1000, p.color(185), 1.4, zoom);
@@ -832,44 +980,61 @@
         const d1norm = Math.sqrt(d1x * d1x + d1y * d1y);
         const d2norm = Math.sqrt(d2x * d2x + d2y * d2y);
 
-        drawWorldText(p, "l₁", Px + (d1x / d1norm) * (74 / zoom), Py + (d1y / d1norm) * (74 / zoom), zoom, 19, true, null, null, 110);
-        drawWorldText(p, "l₂", Qx + (d2x / d2norm) * (95 / zoom), Qy + (d2y / d2norm) * (95 / zoom), zoom, 19, true, null, null, 110);
-
-        const thetaForbidden = nearForbiddenTheta(thetaDeg, 2.0);
-        const equalCase = Math.abs(a - b) < 0.5;
+        if (d1norm > 1e-9) {
+          drawWorldText(p, "l₁", Px + (d1x / d1norm) * (74 / zoom), Py + (d1y / d1norm) * (74 / zoom), zoom, 19, true, null, null, 110);
+        }
+        if (d2norm > 1e-9) {
+          drawWorldText(p, "l₂", Qx + (d2x / d2norm) * (95 / zoom), Qy + (d2y / d2norm) * (95 / zoom), zoom, 19, true, null, null, 110);
+        }
 
         let showR = false;
         let Rx = 0, Ry = 0;
 
-        if (!thetaForbidden && !equalCase && Math.abs(c) > 1e-6 && Math.abs(s) > 1e-6) {
+        if (state.kind === "regular") {
           Rx = a / c;
           Ry = 0;
-
           if (Math.abs(Rx) < 5000) {
             showR = true;
-            pushTracePoint(trace, { x: Rx, y: Ry });
+            pushTracePoint(pointTrace, { x: Rx, y: Ry });
           } else {
-            pushTraceBreak(trace);
+            pushTraceBreak(pointTrace);
           }
-        } else {
-          pushTraceBreak(trace);
+        } else if (state.kind === "sin-zero" && stateAllowed) {
+          pushTraceBreak(pointTrace);
+          if (c >= 0) tracedVerticalPositive = true;
+          if (c <= 0) tracedVerticalNegative = true;
+        } else if (state.kind === "cos-zero" && stateAllowed) {
+          pushTraceBreak(pointTrace);
+          if (equalCase) {
+            if (s >= 0) tracedHorizontalPositive = true;
+            if (s <= 0) tracedHorizontalNegative = true;
+          }
         }
 
-        drawTraceWithBreaks(p, trace, zoom, p.color(37, 99, 235), 2.4);
+        drawTraceWithBreaks(p, pointTrace, zoom, p.color(37, 99, 235), 2.4);
+        drawAccumulatedDegenerateTrace(a, zoom, equalCase);
+
+        if (state.kind === "sin-zero" && stateAllowed) {
+          p.stroke(37, 99, 235);
+          p.strokeWeight(2.4 / zoom);
+          p.line(a * c, -2000, a * c, 2000);
+        }
+        if (state.kind === "cos-zero" && stateAllowed && equalCase) {
+          p.stroke(37, 99, 235);
+          p.strokeWeight(2.4 / zoom);
+          p.line(-2000, a * s, 2000, a * s);
+        }
 
         drawPointWorld(p, 0, 0, 6 / zoom, p.color(30), zoom);
+        drawWorldText(p, "O", 10 / zoom, 12 / zoom, zoom, 18, true);
+
         drawPointWorld(p, Px, Py, 8 / zoom, p.color(60), zoom);
         drawPointWorld(p, Qx, Qy, 8 / zoom, p.color(60), zoom);
-
-        if (showR && Math.abs(Rx) < 5000) {
-          drawPointWorld(p, Rx, Ry, 10 / zoom, p.color(220, 38, 38), zoom);
-        }
-
-        drawWorldText(p, "O", 10 / zoom, 12 / zoom, zoom, 18, true);
         drawWorldText(p, "P", Px + 10 / zoom, Py + 10 / zoom, zoom, 18, true);
         drawWorldText(p, "Q", Qx + 10 / zoom, Qy + 10 / zoom, zoom, 18, true);
 
         if (showR && Math.abs(Rx) < 5000) {
+          drawPointWorld(p, Rx, Ry, 10 / zoom, p.color(220, 38, 38), zoom);
           drawWorldText(p, "R", Rx + 10 / zoom, Ry + 10 / zoom, zoom, 18, true);
         }
 
